@@ -1,0 +1,34 @@
+# Render Blueprint: https://render.com/docs/blueprint-spec
+# Secrets marked "sync: false" are asked for when the Blueprint is created.
+services:
+  - type: web
+    name: yt-music-publisher
+    runtime: node
+    plan: free
+    # Closest Render region to Taiwan
+    region: singapore
+    rootDir: web
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /api/config
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      # Small instance: one encoder thread keeps ffmpeg's memory low
+      - key: FFMPEG_THREADS
+        value: "1"
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: ALLOWED_EMAIL
+        sync: false
+      # YouTube channel refresh token from /yt-token-helper. Optional.
+      - key: YT_REFRESH_TOKEN
+        sync: false
+      # Slack Incoming Webhook for start / done / failed messages. Optional.
+      - key: SLACK_WEBHOOK_URL
+        sync: false
+      # Random value created by Render, no need to generate one
+      - key: SESSION_SECRET
+        generateValue: true

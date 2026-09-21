@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "publisher-web",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--use-env-proxy", "--env-file-if-exists=.env", "server.js"],
+      "cwd": "web",
+      "port": 8080
+    }
+  ]
+}

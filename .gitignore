@@ -1,0 +1,12 @@
+# Songs, covers and rendered videos
+*.mp3
+*.mp4
+*.jpg
+*.jpeg
+*.png
+# ...except the site's own images
+!web/public/*.png
+
+# Node
+node_modules/
+.env

@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>YT Music Publisher</title>
+  <meta name="theme-color" content="#1C1A19">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect x='6' y='6' width='88' height='88' rx='8' fill='%231C1A19' stroke='%23F4F0EA' stroke-width='4'/><text x='50' y='70' font-size='56' text-anchor='middle' fill='%23F4F0EA' font-family='serif'>日</text></svg>">
+  <script>
+    // Apply the saved theme before first paint (default: 宵 / dark).
+    try { if (localStorage.getItem('theme') === 'light') document.documentElement.dataset.theme = 'light'; } catch {}
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;600;800&family=Noto+Sans+JP:wght@300;400;500&family=Noto+Sans+TC:wght@300;400;500&display=swap">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="bar"></div>
+
+  <header class="header">
+    <div class="logo">
+      <div class="logo-gem">日</div>
+      <div>
+        <div class="logo-name">YT MUSIC PUBLISHER</div>
+        <div class="logo-sub">Hiyori Music Studio ❖ 音樂發布</div>
+      </div>
+    </div>
+    <button type="button" id="themeToggle" class="theme-toggle" aria-label="切換深淺色">
+      <span class="t-icon">🌙</span><span class="t-txt">宵</span>
+    </button>
+  </header>
+
+  <main>
+    <div class="lead-row">
+      <p class="lead">封面圖 ＋ mp3 → YouTube ＋ Google Drive</p>
+      <div id="account" class="account" hidden>
+        <span id="accountEmail" class="account-email"></span>
+        <button type="button" id="logout" class="btn btn-quiet btn-small">登出</button>
+      </div>
+    </div>
+
+    <p id="loading" class="status">載入中…</p>
+
+    <section id="login" class="card login" hidden>
+      <h2 class="label"><span class="num">❖</span>登入</h2>
+      <p class="login-text">
+        請使用已授權的 Google 帳號登入。<br>
+        mp3 和封面會存到你 Google Drive 的「<span id="folderName">YT MUSIC PUBLISHER</span>」資料夾。
+      </p>
+      <p class="login-note">登入時請勾選「Google 雲端硬碟」權限。這個網站只能存取它自己建立的檔案。</p>
+      <p id="loginError" class="warn" hidden></p>
+      <a href="auth/login" class="btn btn-primary">以 Google 帳號登入</a>
+    </section>
+
+    <form id="form" novalidate hidden>
+      <section class="card">
+        <h2 class="label"><span class="num">壱</span>封面圖</h2>
+        <label class="file">
+          <input type="file" id="image" accept=".jpg,.jpeg,.png,image/jpeg,image/png" required>
+          <span class="file-box">
+            <img id="preview" alt="" hidden>
+            <span id="imageLabel" class="file-name">點選或拖曳 jpg / png 到這裡</span>
+          </span>
+        </label>
+        <div class="compress">
+          <label class="yt-opt">
+            <input type="checkbox" id="compress" checked>
+            <span>壓縮圖檔（長邊 1280px、jpg 品質 75）</span>
+          </label>
+          <span id="sizeNote" class="size-note"></span>
+          <span class="opt-sub">原圖已經是長邊 1280px 以下的 jpg 時，壓縮省不了多少空間，反而會多損失一點畫質，可以取消勾選。</span>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2 class="label"><span class="num">弐</span>音樂</h2>
+        <label class="file">
+          <input type="file" id="audio" accept=".mp3,audio/mpeg" required>
+          <span class="file-box">
+            <span class="file-icon" aria-hidden="true">♪</span>
+            <span class="file-name">
+              <span id="audioLabel">點選或拖曳 mp3 到這裡</span>
+              <span id="audioMeta" class="audio-meta"></span>
+            </span>
+          </span>
+        </label>
+      </section>
+
+      <section class="card">
+        <h2 class="label"><span class="num">参</span>影片資訊</h2>
+        <label class="field">
+          <span class="field-name">歌曲名稱 <small>預設為 mp3 檔名。用作 YouTube 標題與 Drive 資料夾名稱</small></span>
+          <input type="text" id="title" maxlength="100" required>
+        </label>
+        <label class="field">
+          <span class="field-name">影片說明 <small>YouTube 的說明欄，可留空</small></span>
+          <textarea id="description" rows="10"></textarea>
+          <div id="descCount" class="counter"></div>
+        </label>
+      </section>
+
+      <div id="driveRow" class="yt-row" hidden>
+        <label class="yt-opt">
+          <input type="checkbox" id="driveSave" checked>
+          <span>存到 Google Drive（mp3 ＋ 封面）</span>
+        </label>
+        <code id="drivePath" class="opt-sub"></code>
+      </div>
+
+      <div id="ytRow" class="yt-row" hidden>
+        <label class="yt-opt">
+          <input type="checkbox" id="ytUpload" disabled>
+          <span id="ytLabel">上傳到 YouTube</span>
+        </label>
+        <a id="ytSetup" class="yt-setup" href="yt-token-helper" hidden>立即設定</a>
+      </div>
+
+      <button type="submit" id="submit" class="btn btn-primary">送出</button>
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+      <p id="note" class="note" hidden></p>
+      <p id="reauth" class="status" hidden><a href="auth/login" class="btn btn-i">重新登入</a></p>
+    </form>
+
+  </main>
+
+  <footer class="footer">Hiyori Music Studio ❖ YT Music Publisher ❖ <a href="privacy.html">隱私權政策</a></footer>
+
+  <script src="app.js" type="module"></script>
+</body>
+</html>

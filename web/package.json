@@ -1,0 +1,20 @@
+{
+  "name": "yt-music-publisher",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --use-env-proxy --env-file-if-exists=.env --watch server.js"
+  },
+  "dependencies": {
+    "@jsquash/jpeg": "^1.6.0",
+    "express": "^5.2.1",
+    "ffmpeg-static": "5.2.0",
+    "google-auth-library": "^11.1.0",
+    "multer": "^2.0.2"
+  }
+}
