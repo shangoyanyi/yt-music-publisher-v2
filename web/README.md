@@ -29,7 +29,7 @@ npm run dev
 3. **歌曲名稱**：預設為 mp3 檔名，同時用作 YouTube 標題（最多 100 字）和 Drive 資料夾名稱
 4. **影片說明**：YouTube 說明欄，最多 5000 位元組（中日文一個字約 3 位元組），可留空
 5. 勾選要做的事（預設都打勾）：
-   - **存到 Google Drive**：`YT MUSIC PUBLISHER/yyyy-mm-dd 歌曲名稱/` 底下放 `歌曲名稱.mp3` 和 `歌曲名稱.jpg`
+   - **存到 Google Drive**：`YT Music Publisher/yyyy-mm-dd 歌曲名稱/` 底下放 `歌曲名稱.mp3` 和 `歌曲名稱.jpg`
      （沒壓縮的 png 就是 `.png`）。同名資料夾已存在時改建 `yyyy-mm-dd 歌曲名稱(1)`、`(2)`……，不會覆蓋
    - **上傳到 YouTube**：私人影片，類別音樂
 
@@ -58,7 +58,7 @@ npm run dev
 | 成品 | YouTube ＋ Google Drive | 完成後狀態列下方出現下載連結 |
 
 - 登入只申請 `drive.file` 權限，網站只能存取它自己建立的檔案和資料夾。
-  如果你在 Drive 手動建了同名的 `YT MUSIC PUBLISHER`，網站看不到它，會另外建立一個
+  如果你在 Drive 手動建了同名的 `YT Music Publisher`，網站看不到它，會另外建立一個
 - 伺服器不保存登入者的 Google 授權。登入狀態存在加密 cookie 裡，大約 1 小時後過期，到時重新登入即可
 - 部署在 Render（或 `NODE_ENV=production`）時，沒設定 `GOOGLE_CLIENT_ID` 或 `SESSION_SECRET` 會拒絕啟動，
   避免變成任何人都能使用的轉檔服務
@@ -74,7 +74,7 @@ npm run dev
 | `YT_REFRESH_TOKEN` | — | 上傳 YouTube 用的頻道授權，從 `/yt-token-helper` 取得。不設定就不能上傳 |
 | `SLACK_WEBHOOK_URL` | — | Slack Incoming Webhook。開始、完成、失敗時發訊息。不設定就不發 |
 | `BASE_URL` | 由請求判斷 | OAuth 回呼網址的前綴，通常不用設定 |
-| `DRIVE_FOLDER_NAME` | `YT MUSIC PUBLISHER` | Drive 最上層資料夾名稱 |
+| `DRIVE_FOLDER_NAME` | `YT Music Publisher` | Drive 最上層資料夾名稱 |
 | `TZ_NAME` | `Asia/Taipei` | 資料夾名稱日期用的時區 |
 | `PORT` | `8080` | Render 會自動設定 |
 | `FFMPEG_PATH` | （ffmpeg-static） | 想改用其他 ffmpeg 時才設定 |

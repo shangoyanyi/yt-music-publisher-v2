@@ -25,7 +25,7 @@ const AUTH_ERRORS = {
   failed: '登入失敗，請再試一次。',
 };
 
-const cfg = { rootFolder: 'YT MUSIC PUBLISHER', timeZone: 'Asia/Taipei', descriptionBytes: 5000, uploadMB: 50, notify: null };
+const cfg = { rootFolder: 'YT Music Publisher', timeZone: 'Asia/Taipei', descriptionBytes: 5000, uploadMB: 50, notify: null };
 let signedIn = false; // hosted mode: Drive and YouTube; otherwise local mode (download)
 let ytReady = false;
 let songName = '';

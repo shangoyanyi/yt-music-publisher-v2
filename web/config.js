@@ -15,7 +15,7 @@ export const auth = {
 
 // Each song gets "<root>/<yyyy-mm-dd song>/" holding the mp3 and the cover.
 export const drive = {
-  rootFolder: process.env.DRIVE_FOLDER_NAME || 'YT MUSIC PUBLISHER',
+  rootFolder: process.env.DRIVE_FOLDER_NAME || 'YT Music Publisher',
   // The date in the folder name follows this time zone, not the server's.
   timeZone: process.env.TZ_NAME || 'Asia/Taipei',
 };
