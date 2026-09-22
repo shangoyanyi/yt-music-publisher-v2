@@ -32,6 +32,8 @@ npm run dev
    - **存到 Google Drive**：`YT Music Publisher/yyyy-mm-dd 歌曲名稱/` 底下放 `歌曲名稱.mp3` 和 `歌曲名稱.jpg`
      （沒壓縮的 png 就是 `.png`）。同名資料夾已存在時改建 `yyyy-mm-dd 歌曲名稱(1)`、`(2)`……，不會覆蓋
    - **上傳到 YouTube**：私人影片，類別音樂
+     - **加入播放清單「清單名稱」**：有設定 `YT_PLAYLIST_ID` 才會出現，預設打勾。沒勾「上傳到 YouTube」時不能勾。
+       加入失敗不影響已經上傳的影片，狀態列和 Slack 會顯示警告
 
 ### 處理方式
 
@@ -76,6 +78,7 @@ npm run dev
 | `ALLOWED_EMAIL` | — | 允許登入的 Google 帳號，多個用逗號分隔 |
 | `SESSION_SECRET` | 本機：隨機產生 | 加密登入 cookie 用。部署時必填（Render 會自動產生） |
 | `YT_REFRESH_TOKEN` | — | 上傳 YouTube 用的頻道授權，從 `/yt-token-helper` 取得。不設定就不能上傳 |
+| `YT_PLAYLIST_ID` | — | 預設播放清單，上傳後加入。`/yt-token-helper` 授權完會列出頻道的播放清單 ID。不設定就不顯示這個選項 |
 | `SLACK_WEBHOOK_URL` | — | Slack Incoming Webhook。開始、完成、失敗時發訊息。不設定就不發 |
 | `BASE_URL` | 由請求判斷 | OAuth 回呼網址的前綴，通常不用設定 |
 | `DRIVE_FOLDER_NAME` | `YT Music Publisher` | Drive 最上層資料夾名稱 |
@@ -98,7 +101,8 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
 1. 「API 和服務」→「程式庫」→ 啟用 **Google Drive API** 和 **YouTube Data API v3**
 2. 「Google Auth Platform」→「資料存取」→ 新增範圍：
-   `openid`、`.../auth/userinfo.email`、`.../auth/drive.file`、`.../auth/youtube.upload`、`.../auth/youtube.readonly`
+   `openid`、`.../auth/userinfo.email`、`.../auth/drive.file`、`.../auth/youtube.upload`、`.../auth/youtube.readonly`、
+   `.../auth/youtube.force-ssl`（把影片加進播放清單用）
 3. 「Google Auth Platform」→「目標對象」→ 發布狀態改成 **正式版**（不用送驗證）。
    **沒改的話 YouTube 的 refresh token 7 天就會失效。** 登入時會看到「Google 尚未驗證這個應用程式」，按繼續即可
 4. 「Google Auth Platform」→「用戶端」→ 網頁應用程式的用戶端 → **已授權的重新導向 URI** 加上：
@@ -127,10 +131,15 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 1. 登入網站後打開 `/yt-token-helper`（或點「送出」上方的「立即設定」）
 2. 按「用頻道帳號授權」，**選要上傳的頻道帳號**；品牌帳號要選頻道本身
 3. 頁面會顯示頻道名稱和 refresh token，複製到 Render 的 `YT_REFRESH_TOKEN`（本機放 `web/.env`）
-4. 重新部署後，「送出」上方會出現「☑ 上傳到 頻道名稱（私人）」
+4. 同一頁會列出頻道的播放清單和 ID，要自動加入的那個 ID 填到 `YT_PLAYLIST_ID`
+5. 重新部署後，「送出」上方會出現「☑ 上傳到 頻道名稱（私人）」和「☑ 加入播放清單「清單名稱」」
 
+- **播放清單需要 `youtube.force-ssl` 權限**，Google 授權畫面會寫成可以管理（包含刪除）頻道影片的權限。
+  網站只用它把新影片加進預設播放清單。**在加上這個權限之前取得的 token 沒有這個權限**，
+  影片照樣能上傳，但勾選框下方會顯示「頻道授權缺少播放清單權限」，重新授權一次就好
+- 網站會檢查預設播放清單存在、而且屬於這個頻道，不符合時勾選框不能勾，下方顯示原因
 - **關聯影片、縮圖、公開等設定 API 做不到**，要到 YouTube Studio 手動設定；Slack 通知裡有 Studio 連結
-- 每支上傳約用 1,600 單位配額，每天 10,000 單位，約 6 支
+- 每支上傳約用 1,600 單位配額，加入播放清單再用 50 單位；每天 10,000 單位，約 6 支
 
 ### Slack 通知
 
@@ -144,5 +153,6 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ▶ 開始處理：灼けた空（Drive、YouTube） · you@gmail.com
 ✅ 完成：灼けた空（花了 35 秒）
 YouTube（私人）：在 Studio 設定並公開        ← Studio 連結
+播放清單：ひよりの音楽
 Google Drive：2026-09-21 灼けた空              ← 資料夾連結
 ```

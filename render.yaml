@@ -26,6 +26,9 @@ services:
       # YouTube channel refresh token from /yt-token-helper. Optional.
       - key: YT_REFRESH_TOKEN
         sync: false
+      # Default playlist the uploads are added to; /yt-token-helper lists the IDs. Optional.
+      - key: YT_PLAYLIST_ID
+        sync: false
       # Slack Incoming Webhook for start / done / failed messages. Optional.
       - key: SLACK_WEBHOOK_URL
         sync: false

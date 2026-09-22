@@ -23,7 +23,7 @@ let running = null;
 
 export class QueueFullError extends Error {}
 
-export function submitJob({ owner, token, youtube, drive, uploads, audio, image, base, title, description }) {
+export function submitJob({ owner, token, youtube, playlist, drive, uploads, audio, image, base, title, description }) {
   const local = owner === 'local';
   const wantsVideo = Boolean(youtube) || local;
   if (!drive && !wantsVideo) throw new Error('nothing to do');
@@ -35,6 +35,7 @@ export function submitJob({ owner, token, youtube, drive, uploads, audio, image,
     local,
     token, // Drive access token; null in local mode. Dropped when the job ends.
     youtube, // uploader, or null
+    playlist: Boolean(playlist), // also add the video to the default playlist
     uploads,
     audio, // { path, name, mimeType }
     image,
@@ -142,6 +143,16 @@ async function runVideo(job) {
     if (job.youtube) {
       v.state = 'publishing';
       v.result = await job.youtube.upload(out.file, { title: job.title, description: job.description });
+      if (job.playlist) {
+        // The video is up already: a failure here is only a warning.
+        try {
+          v.result.playlist = await job.youtube.addToPlaylist(v.result.id);
+        } catch (err) {
+          if (err instanceof YouTubeAuthError) job.youtube.forget();
+          v.result.playlistError = `沒能加入播放清單：${err.message ?? err}`;
+          console.error(err);
+        }
+      }
     }
     if (job.local) {
       // Local mode: keep the file for the page to download.
@@ -165,11 +176,14 @@ function finish(job) {
   const took = Math.round((job.finishedAt - job.createdAt) / 1000);
   const parts = [job.drive, job.video].filter((p) => p.state !== 'off');
   const failed = parts.filter((p) => p.state === 'failed').length;
-  const head = failed === 0 ? '✅ 完成' : failed < parts.length ? '⚠️ 部分完成' : '❌ 失敗';
+  const warned = Boolean(job.video.result?.playlistError);
+  const head = failed === 0 ? (warned ? '⚠️ 完成（有警告）' : '✅ 完成') : failed < parts.length ? '⚠️ 部分完成' : '❌ 失敗';
   const lines = [`${head}：*${esc(job.base)}*（花了 ${took} 秒）`];
 
   const yt = job.video.result;
   if (yt?.studioUrl) lines.push(`YouTube（私人）：<${yt.studioUrl}|在 Studio 設定並公開>`);
+  if (yt?.playlist) lines.push(`播放清單：${esc(yt.playlist.title)}`);
+  if (yt?.playlistError) lines.push(`⚠️ ${esc(yt.playlistError)}`);
   else if (job.video.state === 'failed') lines.push(`・${esc(job.video.error)}`);
   else if (yt?.download) lines.push('影片已轉好，可從網頁下載');
 

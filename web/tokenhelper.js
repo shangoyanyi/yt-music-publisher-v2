@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import express from 'express';
 import { OAuth2Client } from 'google-auth-library';
 import { readCookie, sameString } from './auth.js';
-import { READ_SCOPE, UPLOAD_SCOPE, fetchChannel } from './youtube.js';
+import { MANAGE_SCOPE, READ_SCOPE, UPLOAD_SCOPE, fetchChannel, fetchPlaylists } from './youtube.js';
 
 const STATE_COOKIE = 'yt_state';
 const STATE_MAX_AGE = 10 * 60 * 1000;
@@ -38,10 +38,11 @@ export function createTokenHelper({ auth, clientId, clientSecret, baseUrl, youtu
       <ol class="steps">
         <li>按下方按鈕，用<strong>要上傳影片的 YouTube 頻道帳號</strong>授權。可以跟登入網站的帳號不同；
             如果頻道是品牌帳號，選身分時要選頻道本身。</li>
-        <li>授權完成後，這頁會顯示頻道名稱和一串 refresh token。</li>
+        <li>授權完成後，這頁會顯示頻道名稱、一串 refresh token，以及頻道的播放清單和 ID。</li>
         <li>把 token 貼到 Render 的環境變數 <code>YT_REFRESH_TOKEN</code>（本機測試則放進 <code>web/.env</code>），存檔後會自動重新部署。</li>
       </ol>
-      <p class="login-note">會申請兩個權限：上傳影片、讀取頻道名稱。網站不會修改或刪除頻道上的任何東西。</p>
+      <p class="login-note">會申請三個權限：上傳影片、讀取頻道和播放清單、管理播放清單（把新影片加進預設播放清單）。
+        網站不會修改或刪除頻道上既有的影片。</p>
       <a class="btn btn-primary" href="/yt-token-helper/start">用頻道帳號授權</a>
       <a class="btn btn-quiet btn-block" href="/">回到 YT Music Publisher</a>`));
   });
@@ -52,7 +53,7 @@ export function createTokenHelper({ auth, clientId, clientSecret, baseUrl, youtu
     res.redirect(client.generateAuthUrl({
       access_type: 'offline', // we want the refresh token
       prompt: 'consent select_account', // always pick the account, always return a refresh token
-      scope: [UPLOAD_SCOPE, READ_SCOPE],
+      scope: [UPLOAD_SCOPE, READ_SCOPE, MANAGE_SCOPE],
       state,
       redirect_uri: redirectUri(req),
     }));
@@ -77,6 +78,16 @@ export function createTokenHelper({ auth, clientId, clientSecret, baseUrl, youtu
       const ch = granted.includes(READ_SCOPE)
         ? await fetchChannel(tokens.access_token)
         : { status: 'invalid', error: '沒有允許讀取頻道名稱' };
+      const playlists = granted.includes(READ_SCOPE) ? await fetchPlaylists(tokens.access_token).catch(() => null) : null;
+      const manage = granted.includes(MANAGE_SCOPE)
+        ? ''
+        : '<p class="warn">沒有允許「管理播放清單」，影片仍可上傳，但不能自動加入播放清單。需要的話請重新授權並勾選。</p>';
+      const playlistBlock = !playlists
+        ? '<p class="login-note">讀不到播放清單。</p>'
+        : !playlists.length
+          ? '<p class="login-note">這個頻道還沒有播放清單。</p>'
+          : `<p class="login-text">要自動加入播放清單的話，把其中一個 ID 貼到 <code>YT_PLAYLIST_ID</code>：</p>
+             <ul class="steps">${playlists.map((p) => `<li>${esc(p.title)}<br><code>${esc(p.id)}</code></li>`).join('')}</ul>`;
       const channel = ch.status === 'ok'
         ? `<p class="login-text">授權的頻道：<strong>${esc(ch.title)}</strong></p>`
         : `<p class="warn">讀不到頻道名稱（${esc(ch.error)}）。上傳仍可運作，但請確認選的是正確的帳號。</p>`;
@@ -90,9 +101,11 @@ export function createTokenHelper({ auth, clientId, clientSecret, baseUrl, youtu
           <textarea id="token" class="token" readonly rows="3">${esc(tokens.refresh_token)}</textarea>
         </label>
         <button type="button" class="btn btn-primary" id="copy">複製 token</button>
-        <p class="warn">這串 token 等同頻道的上傳權限，只貼到 Render 環境變數和本機 <code>web/.env</code>，不要截圖、分享或放進 GitHub。</p>
+        ${manage}
+        ${playlistBlock}
+        <p class="warn">這串 token 等同頻道的上傳和播放清單管理權限，只貼到 Render 環境變數和本機 <code>web/.env</code>，不要截圖、分享或放進 GitHub。</p>
         <ol class="steps">
-          <li>Render 服務 → Environment → 新增或更新 <code>YT_REFRESH_TOKEN</code> → 存檔，等重新部署完成。</li>
+          <li>Render 服務 → Environment → 新增或更新 <code>YT_REFRESH_TOKEN</code>（和 <code>YT_PLAYLIST_ID</code>）→ 存檔，等重新部署完成。</li>
           <li>回到首頁，「送出」上方會出現「上傳到 ${esc(ch.status === 'ok' ? ch.title : '頻道')}」。</li>
           <li>重新授權會產生新的 token，舊的可能會失效，記得把 Render 上的值一起換掉。</li>
         </ol>

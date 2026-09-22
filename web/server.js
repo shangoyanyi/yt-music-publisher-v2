@@ -72,7 +72,9 @@ app.get('/api/youtube', identify, async (req, res) => {
   if (!auth) return res.json({ status: 'unavailable' });
   if (!youtube) return res.json({ status: 'missing' });
   const ch = await youtube.channel();
-  res.json(ch.status === 'ok' ? { status: 'ok', title: ch.title } : { status: 'invalid', error: ch.error });
+  res.json(ch.status === 'ok'
+    ? { status: 'ok', title: ch.title, playlist: ch.playlist }
+    : { status: 'invalid', error: ch.error });
 });
 
 app.get('/api/me', (req, res) => {
@@ -106,6 +108,7 @@ app.post(
         token: wantDrive ? req.user.token : null,
         drive: wantDrive,
         youtube: wantYouTube ? youtube : null,
+        playlist: wantYouTube && req.body.playlist === '1',
         uploads, // the job deletes them when it ends
         audio: { path: audio.path, name: 'audio.mp3', mimeType: 'audio/mpeg' },
         image: png

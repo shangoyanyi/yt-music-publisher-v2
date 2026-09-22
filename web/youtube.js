@@ -4,6 +4,8 @@ import { youtube as config } from './config.js';
 
 export const UPLOAD_SCOPE = 'https://www.googleapis.com/auth/youtube.upload';
 export const READ_SCOPE = 'https://www.googleapis.com/auth/youtube.readonly';
+// Needed to add videos to a playlist; upload and readonly cannot.
+export const MANAGE_SCOPE = 'https://www.googleapis.com/auth/youtube.force-ssl';
 
 const API = 'https://www.googleapis.com/youtube/v3';
 const UPLOAD = 'https://www.googleapis.com/upload/youtube/v3/videos';
@@ -12,7 +14,8 @@ const CHANNEL_TTL = 10 * 60 * 1000;
 export class YouTubeAuthError extends Error {}
 
 /**
- * Uploads to one fixed channel with a long-lived refresh token (YT_REFRESH_TOKEN).
+ * Uploads to one fixed channel with a long-lived refresh token (YT_REFRESH_TOKEN),
+ * and optionally adds the video to one default playlist (YT_PLAYLIST_ID).
  * Returns null when no token is configured.
  */
 export function createYouTube({ clientId, clientSecret }) {
@@ -34,17 +37,56 @@ export function createYouTube({ clientId, clientSecret }) {
     }
   }
 
-  /** { status: 'ok', title, id } or { status: 'invalid', error } */
+  /**
+   * { status: 'ok', title, id, playlist } or { status: 'invalid', error }
+   * playlist: null (none configured), { status: 'ok', title } or { status: 'invalid', error }
+   */
   async function channel() {
     if (cached && Date.now() - cached.at < CHANNEL_TTL) return cached.value;
     let value;
     try {
-      value = await fetchChannel(await accessToken());
+      const token = await accessToken();
+      value = await fetchChannel(token);
+      if (value.status === 'ok') value.playlist = await checkPlaylist(token, value.id);
     } catch (err) {
       value = { status: 'invalid', error: err.message };
     }
     cached = { at: Date.now(), value };
     return value;
+  }
+
+  // The default playlist must exist, belong to this channel, and the token must be allowed to edit it.
+  async function checkPlaylist(token, channelId) {
+    if (!config.playlistId) return null;
+    try {
+      const { scopes = [] } = await client.getTokenInfo(token);
+      if (!scopes.includes(MANAGE_SCOPE)) {
+        return { status: 'invalid', error: '頻道授權缺少播放清單權限，請到 /yt-token-helper 重新授權' };
+      }
+      const params = new URLSearchParams({ part: 'snippet', id: config.playlistId });
+      const { items = [] } = await call(token, `${API}/playlists?${params}`).then((r) => r.json());
+      if (!items.length) return { status: 'invalid', error: `找不到播放清單 ${config.playlistId}` };
+      if (items[0].snippet.channelId !== channelId) return { status: 'invalid', error: '預設播放清單不屬於這個頻道' };
+      return { status: 'ok', title: items[0].snippet.title };
+    } catch (err) {
+      return { status: 'invalid', error: err.message };
+    }
+  }
+
+  /** Add a video to the default playlist. Returns { title } of the playlist. */
+  async function addToPlaylist(videoId) {
+    const ch = await channel();
+    const pl = ch.playlist;
+    if (!pl) throw new Error('沒有設定預設播放清單');
+    if (pl.status !== 'ok') throw new Error(pl.error);
+    await call(await accessToken(), `${API}/playlistItems?part=snippet`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+      body: JSON.stringify({
+        snippet: { playlistId: config.playlistId, resourceId: { kind: 'youtube#video', videoId } },
+      }),
+    });
+    return { title: pl.title };
   }
 
   // title and description come already cleaned (names.js).
@@ -78,7 +120,7 @@ export function createYouTube({ clientId, clientSecret }) {
     };
   }
 
-  return { channel, upload, forget: () => { cached = null; } };
+  return { channel, upload, addToPlaylist, forget: () => { cached = null; } };
 }
 
 /** Channel of whoever the access token belongs to. Needs youtube.readonly. */
@@ -89,6 +131,20 @@ export async function fetchChannel(token) {
   return { status: 'ok', id: items[0].id, title: items[0].snippet.title };
 }
 
+/** Playlists of whoever the access token belongs to, for /yt-token-helper. Needs youtube.readonly. */
+export async function fetchPlaylists(token) {
+  const list = [];
+  let pageToken = '';
+  do {
+    const params = new URLSearchParams({ part: 'snippet', mine: 'true', maxResults: '50' });
+    if (pageToken) params.set('pageToken', pageToken);
+    const page = await call(token, `${API}/playlists?${params}`).then((r) => r.json());
+    for (const p of page.items ?? []) list.push({ id: p.id, title: p.snippet.title });
+    pageToken = page.nextPageToken ?? '';
+  } while (pageToken);
+  return list;
+}
+
 async function call(token, url, init = {}) {
   const res = await fetch(url, { ...init, headers: { Authorization: `Bearer ${token}`, ...init.headers } });
   if (res.ok) return res;
@@ -97,5 +153,9 @@ async function call(token, url, init = {}) {
   const reason = /"reason":\s*"([^"]+)"/.exec(text)?.[1] ?? '';
   if (reason === 'quotaExceeded') throw new Error('今天的 YouTube API 配額用完了，明天再上傳');
   if (reason === 'uploadLimitExceeded') throw new Error('頻道今天的上傳次數已達上限');
+  if (reason === 'insufficientPermissions' || /ACCESS_TOKEN_SCOPE_INSUFFICIENT/.test(text)) {
+    throw new Error('頻道授權缺少需要的權限，請到 /yt-token-helper 重新授權');
+  }
+  if (reason === 'playlistNotFound') throw new Error('找不到預設播放清單');
   throw new Error(`YouTube API ${res.status}${reason ? ` ${reason}` : ''}: ${text.slice(0, 300)}`);
 }

@@ -25,6 +25,8 @@ export const drive = {
 // and is issued to this app's own OAuth client. Unset = no YouTube upload.
 export const youtube = {
   refreshToken: process.env.YT_REFRESH_TOKEN ?? '',
+  // Default playlist the uploads are added to (optional). /yt-token-helper lists the IDs.
+  playlistId: (process.env.YT_PLAYLIST_ID ?? '').trim(),
   // Unverified API projects can only upload private videos anyway.
   privacy: 'private',
   categoryId: '10', // Music

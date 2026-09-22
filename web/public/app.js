@@ -12,6 +12,7 @@ const els = {
   title: $('title'), description: $('description'), descCount: $('descCount'),
   driveRow: $('driveRow'), driveSave: $('driveSave'), drivePath: $('drivePath'),
   ytRow: $('ytRow'), ytUpload: $('ytUpload'), ytLabel: $('ytLabel'), ytSetup: $('ytSetup'),
+  playlistOpt: $('playlistOpt'), playlistAdd: $('playlistAdd'), playlistLabel: $('playlistLabel'), playlistWarn: $('playlistWarn'),
   submit: $('submit'), status: $('status'), note: $('note'), reauth: $('reauth'),
   loading: $('loading'), login: $('login'), loginError: $('loginError'), folderName: $('folderName'),
   account: $('account'), accountEmail: $('accountEmail'), logout: $('logout'),
@@ -28,6 +29,7 @@ const AUTH_ERRORS = {
 const cfg = { rootFolder: 'YT Music Publisher', timeZone: 'Asia/Taipei', descriptionBytes: 5000, uploadMB: 50, notify: null };
 let signedIn = false; // hosted mode: Drive and YouTube; otherwise local mode (download)
 let ytReady = false;
+let playlistReady = false;
 let songName = '';
 let titleEdited = false;
 let cover = null; // { file, ready: Promise<File> } - what gets uploaded as the cover
@@ -93,7 +95,23 @@ async function loadYouTube() {
   els.ytLabel.textContent = ytReady ? `上傳到 ${yt.title}（私人）` : '上傳到 YouTube';
   els.ytSetup.hidden = ytReady;
   els.ytSetup.textContent = yt.status === 'invalid' ? '頻道授權失效，重新設定' : '尚未設定頻道，立即設定';
+
+  // Default playlist (YT_PLAYLIST_ID): a sub-option of the upload, ticked by default.
+  const pl = ytReady ? yt.playlist : null;
+  playlistReady = pl?.status === 'ok';
+  els.playlistOpt.hidden = !pl;
+  els.playlistAdd.checked = playlistReady;
+  els.playlistLabel.textContent = playlistReady ? `加入播放清單「${pl.title}」` : '加入播放清單';
+  els.playlistWarn.hidden = !pl || playlistReady;
+  els.playlistWarn.textContent = pl && !playlistReady ? `預設播放清單無法使用：${pl.error}` : '';
+  syncPlaylist();
 }
+
+// No upload, no playlist.
+function syncPlaylist() {
+  els.playlistAdd.disabled = !playlistReady || !els.ytUpload.checked;
+}
+els.ytUpload.addEventListener('change', syncPlaylist);
 
 els.logout.addEventListener('click', async () => {
   await fetch('auth/logout', { method: 'POST' }).catch(() => {});
@@ -377,6 +395,7 @@ els.form.addEventListener('submit', async (ev) => {
     body.append('description', els.description.value);
     body.append('drive', drive ? '1' : '0');
     body.append('youtube', youtube ? '1' : '0');
+    body.append('playlist', youtube && playlistReady && els.playlistAdd.checked ? '1' : '0');
     body.append('audio', audio);
     body.append('image', image);
 
@@ -456,15 +475,17 @@ async function track(job) {
   const parts = [job.drive, job.video].filter((p) => p.state !== 'off');
   const errors = parts.filter((p) => p.state === 'failed').map((p) => p.error);
   const took = Math.round(job.elapsedMs / 1000);
-  if (!errors.length) setStatus(`完成：${job.name}，花了 ${took} 秒`);
+  const warning = job.video.result?.playlistError;
+  if (!errors.length && warning) setStatus(`完成：${job.name}，花了 ${took} 秒\n但${warning}`, true);
+  else if (!errors.length) setStatus(`完成：${job.name}，花了 ${took} 秒`);
   else {
     const head = errors.length < parts.length ? `部分完成：${job.name}` : `失敗：${job.name}`;
-    setStatus([head, ...errors].join('\n'), true);
+    setStatus([head, ...errors, ...(warning ? [warning] : [])].join('\n'), true);
   }
   // Local mode has no Drive or YouTube: offer the rendered video instead.
   if (job.video.result?.download) showDownload(job.video.result);
   els.reauth.hidden = !job.reauth;
-  if (job.video.state === 'failed') loadYouTube(); // the checkbox may need "重新設定" now
+  if (job.video.state === 'failed' || warning) loadYouTube(); // the checkboxes may need "重新設定" now
   stopTracking();
 }
 

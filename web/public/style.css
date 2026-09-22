@@ -482,6 +482,10 @@ textarea {
   accent-color: var(--a-primary);
 }
 .yt-opt:has(input:disabled) { color: var(--s-text-muted); cursor: not-allowed; }
+.yt-opt[hidden] { display: none; }
+/* second-level option under "上傳到 YouTube" */
+.yt-sub { flex-basis: 100%; padding-left: 26px; font-size: 13px; }
+.yt-row .warn { flex-basis: 100%; margin-top: 4px; }
 .yt-setup {
   font-size: 12px;
   color: var(--i-text);
