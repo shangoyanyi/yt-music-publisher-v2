@@ -8,7 +8,7 @@ const els = {
   form: $('form'),
   audio: $('audio'), audioLabel: $('audioLabel'), audioMeta: $('audioMeta'),
   image: $('image'), imageLabel: $('imageLabel'), preview: $('preview'),
-  compress: $('compress'), sizeNote: $('sizeNote'),
+  compress: $('compress'), sizeNote: $('sizeNote'), compressWarn: $('compressWarn'),
   title: $('title'), description: $('description'), descCount: $('descCount'),
   driveRow: $('driveRow'), driveSave: $('driveSave'), drivePath: $('drivePath'),
   ytRow: $('ytRow'), ytUpload: $('ytUpload'), ytLabel: $('ytLabel'), ytSetup: $('ytSetup'),
@@ -167,6 +167,7 @@ function swapUrl(key, file) {
 function prepareCover() {
   const file = els.image.files[0];
   if (!file) return;
+  els.compressWarn.hidden = true;
   if (!els.compress.checked) {
     cover = { file, ready: Promise.resolve(file) };
     setSize(mb(file.size));
@@ -175,7 +176,11 @@ function prepareCover() {
   setSize('壓縮中…');
   const ready = compressCover(file).then(
     (out) => {
-      if (cover?.ready === ready) setSize(`${mb(file.size)} → ${mb(out.size)}（${out.dims}）`);
+      if (cover?.ready === ready) {
+        setSize(`${mb(file.size)} → ${mb(out.size)}（${out.dims}）`);
+        // Already a small jpg: compressing again saves little and costs some quality.
+        els.compressWarn.hidden = !out.alreadySmall;
+      }
       return out.file;
     },
     (err) => {
@@ -193,6 +198,7 @@ async function compressCover(file) {
   encoder ??= import('./vendor/jsquash-jpeg/encode.js').then((m) => m.default);
   const [encode, bmp] = await Promise.all([encoder, createImageBitmap(file)]);
 
+  const alreadySmall = isJpeg(file) && Math.max(bmp.width, bmp.height) <= COVER_MAX;
   const scale = Math.min(1, COVER_MAX / Math.max(bmp.width, bmp.height));
   const w = Math.max(1, Math.round(bmp.width * scale));
   const h = Math.max(1, Math.round(bmp.height * scale));
@@ -211,7 +217,7 @@ async function compressCover(file) {
   // files it writes (flat, single-colour images), and Drive previews handle baseline fine.
   const data = await encode(ctx.getImageData(0, 0, w, h), { quality: COVER_QUALITY, progressive: false });
   const name = file.name.replace(/\.[^.]*$/, '') + '.jpg';
-  return { file: new File([data], name, { type: 'image/jpeg' }), size: data.byteLength, dims: `${w}×${h}` };
+  return { file: new File([data], name, { type: 'image/jpeg' }), size: data.byteLength, dims: `${w}×${h}`, alreadySmall };
 }
 
 function setSize(text, isError = false) {
@@ -223,6 +229,7 @@ function setSize(text, isError = false) {
 // Drop on a box, or anywhere on the page: files are sorted by type,
 // so a cover and an mp3 can be dropped together.
 
+const isJpeg = (f) => f.type === 'image/jpeg' || /\.jpe?g$/i.test(f.name);
 const isImage = (f) => /^image\/(jpeg|png)$/.test(f.type) || /\.(jpe?g|png)$/i.test(f.name);
 const isAudio = (f) => /^audio\/(mpeg|mp3)$/.test(f.type) || /\.mp3$/i.test(f.name);
 

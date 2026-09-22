@@ -412,6 +412,7 @@ textarea {
   gap: 4px 12px;
   margin-top: 12px;
 }
+.compress .warn { flex-basis: 100%; }
 .size-note {
   font-size: 12px;
   letter-spacing: 0.02em;
