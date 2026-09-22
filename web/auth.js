@@ -8,6 +8,10 @@ const SCOPES = ['openid', 'email', DRIVE_SCOPE];
 const SESSION_COOKIE = 'sm_session';
 const STATE_COOKIE = 'sm_state';
 const STATE_MAX_AGE = 10 * 60 * 1000;
+// The last account that signed in, so the next sign-in skips Google's account picker.
+// Renewed on every successful sign-in, cleared on logout and on any failed sign-in.
+const HINT_COOKIE = 'sm_hint';
+const HINT_MAX_AGE = 180 * 24 * 60 * 60 * 1000;
 // Queue wait + render + Drive upload must finish before the access token expires.
 const MIN_TOKEN_LIFE = 10 * 60 * 1000;
 
@@ -50,18 +54,26 @@ export function createAuth({ clientId, clientSecret, allowedEmails, sessionSecre
     return session;
   }
 
-  const fail = (res, code) => res.redirect(`/?auth_error=${code}`);
+  // A failed sign-in forgets the remembered account, so the next try shows the picker.
+  const fail = (res, code) => {
+    res.clearCookie(HINT_COOKIE, { path: '/' });
+    res.redirect(`/?auth_error=${code}`);
+  };
   const revoke = (token) => client.revokeToken(token).catch(() => {});
 
   router.get('/auth/login', (req, res) => {
     const state = randomBytes(16).toString('hex');
     res.cookie(STATE_COOKIE, state, cookieOpts(req, STATE_MAX_AGE));
+    // Sealed like the session; unreadable (tampered, or SESSION_SECRET changed) = no hint.
+    const raw = readCookie(req, HINT_COOKIE);
+    const hint = raw ? unseal(raw)?.email : null;
     res.redirect(client.generateAuthUrl({
       access_type: 'online',
       scope: SCOPES,
       state,
       redirect_uri: redirectUri(req),
-      prompt: 'select_account',
+      // Remembered account: go straight to it. Otherwise (first time, or after logout): pick one.
+      ...(typeof hint === 'string' && hint ? { login_hint: hint } : { prompt: 'select_account' }),
     }));
   });
 
@@ -89,6 +101,7 @@ export function createAuth({ clientId, clientSecret, allowedEmails, sessionSecre
 
       const exp = tokens.expiry_date ?? Date.now() + 55 * 60 * 1000;
       res.cookie(SESSION_COOKIE, seal({ email: normalized, token: tokens.access_token, exp }), cookieOpts(req, exp - Date.now()));
+      res.cookie(HINT_COOKIE, seal({ email: normalized }), cookieOpts(req, HINT_MAX_AGE)); // 180 days from this sign-in
       res.redirect('/');
     } catch (err) {
       console.error('OAuth callback failed:', err.message);
@@ -100,6 +113,7 @@ export function createAuth({ clientId, clientSecret, allowedEmails, sessionSecre
     const session = getSession(req);
     if (session) revoke(session.token);
     res.clearCookie(SESSION_COOKIE, { path: '/' });
+    res.clearCookie(HINT_COOKIE, { path: '/' }); // next sign-in counts as the first one again
     res.status(204).end();
   });
 

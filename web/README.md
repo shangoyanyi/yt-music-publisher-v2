@@ -60,6 +60,10 @@ npm run dev
 - 登入只申請 `drive.file` 權限，網站只能存取它自己建立的檔案和資料夾。
   如果你在 Drive 手動建了同名的 `YT Music Publisher`，網站看不到它，會另外建立一個
 - 伺服器不保存登入者的 Google 授權。登入狀態存在加密 cookie 裡，大約 1 小時後過期，到時重新登入即可
+- **記住上次登入的帳號**：登入成功後記住帳號（cookie `sm_hint`，跟登入狀態一樣加密並設為 httpOnly，
+  從最近一次登入成功起算 180 天；解不開就當成沒有記住），
+  之後按登入會直接帶給 Google（`login_hint`），不再跳出選帳號畫面。
+  **按登出或登入失敗會清掉**，下次登入視同初次登入。`/yt-token-helper` 不受影響，仍然每次選帳號
 - 部署在 Render（或 `NODE_ENV=production`）時，沒設定 `GOOGLE_CLIENT_ID` 或 `SESSION_SECRET` 會拒絕啟動，
   避免變成任何人都能使用的轉檔服務
 
